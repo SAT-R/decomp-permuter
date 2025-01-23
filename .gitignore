@@ -10,3 +10,6 @@ __pycache__/
 .vscode/
 pah.conf
 decompme_mappings.toml
+lextab.py
+yacctab.py
+venv

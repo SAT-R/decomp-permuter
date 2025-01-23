@@ -19,6 +19,7 @@ from typing import (
 )
 
 from pycparser import c_ast as ca
+from pycparserext.ext_c_parser import FuncDeclExt
 
 from . import ast_util
 from .ast_util import Block, Indices, Statement, Expression, to_c_raw
@@ -378,7 +379,7 @@ def visit_replace(top_node: ca.Node, callback: Callable[[ca.Node, bool], Any]) -
         ):
             pass
         else:
-            _: ca.Alignas = node
+            _: Any = node
             assert False, f"Node with unknown type: {node}"
         return node
 
@@ -442,7 +443,7 @@ def random_type(random: Random) -> SimpleType:
     quals = []
     if random_bool(random, 0.5):
         quals = ["volatile"]
-    return ca.TypeDecl(declname=None, quals=quals, align=[], type=idtype)
+    return ca.TypeDecl(declname=None, quals=quals, type=idtype)
 
 
 def randomize_type(
@@ -970,14 +971,14 @@ def perm_randomize_function_type(
         item = ast.ext[i]
         if (
             isinstance(item, ca.Decl)
-            and isinstance(item.type, ca.FuncDecl)
+            and isinstance(item.type, (ca.FuncDecl, FuncDeclExt))
             and item.name == name
         ):
             new_decl = copy.copy(item)
             all_decls.append((new_decl, i, new_decl))
         if isinstance(item, ca.FuncDef) and item.decl.name == name:
             assert isinstance(
-                item.decl.type, ca.FuncDecl
+                item.decl.type, (ca.FuncDecl, FuncDeclExt)
             ), "function definitions have function types"
             new_fndef = copy.copy(item)
             new_decl = copy.copy(item.decl)
@@ -995,7 +996,7 @@ def perm_randomize_function_type(
     typemap = build_typemap(ast, fn)
 
     main_fndecl = copy.deepcopy(main_decl.type)
-    assert isinstance(main_fndecl, ca.FuncDecl), "checked above"
+    assert isinstance(main_fndecl, (ca.FuncDecl, FuncDeclExt)), "checked above"
     main_decl.type = main_fndecl
 
     if random_bool(random, 0.5):
@@ -1008,7 +1009,7 @@ def perm_randomize_function_type(
         elif random_bool(random, PROB_RET_VOID):
             idtype = ca.IdentifierType(names=["void"])
             main_fndecl.type = ca.TypeDecl(
-                declname=None, quals=[], align=[], type=idtype
+                declname=None, quals=[], type=idtype
             )
         else:
             main_fndecl.type = randomize_type(

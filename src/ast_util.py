@@ -6,13 +6,13 @@ from random import Random
 import re
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, Union
 
-from pycparser import c_ast as ca, c_generator
-from pycparser.c_parser import CParser
+from pycparser import c_ast as ca
+from pycparserext.ext_c_generator import GnuCGenerator as CGenerator
+from pycparserext.ext_c_parser import GnuCParser as CParser
 from pycparser.plyparser import ParseError
 
 from .error import CandidateConstructionFailure
 from .ast_types import SimpleType, set_decl_name
-
 
 @dataclass
 class Indices:
@@ -31,7 +31,7 @@ else:
 
 
 def to_c_raw(node: ca.Node) -> str:
-    source: str = c_generator.CGenerator().visit(node)
+    source: str = CGenerator().visit(node)
     return source
 
 
@@ -87,7 +87,7 @@ def process_pragmas(source: str) -> str:
     return "".join(out).rstrip() + "\n"
 
 
-class PatchedCGenerator(c_generator.CGenerator):
+class PatchedCGenerator(CGenerator):
     """Like a CGenerator, except it keeps else if's prettier despite
     the terrible things we've done to them in normalize_ast."""
 
@@ -159,6 +159,10 @@ def compute_node_indices(top_node: ca.Node) -> Indices:
     class Visitor(ca.NodeVisitor):
         def generic_visit(self, node: ca.Node) -> None:
             nonlocal cur_index
+            if type(node) == list:
+                if not node:
+                    return
+                node = node[0]
             assert node not in starts, "nodes should only appear once in AST"
             starts[node] = cur_index
             cur_index += 2
@@ -274,7 +278,7 @@ def make_decl(
     type: "ca.Type",
     *,
     quals: Optional[List[str]] = None,
-    align: Optional[List[ca.Alignas]] = None,
+    align: Optional[List[Any]] = None,
     storage: Optional[List[str]] = None,
     funcspec: Optional[List[str]] = None,
     init: Optional[Union[Expression, ca.InitList]] = None,
@@ -284,7 +288,6 @@ def make_decl(
     decl = ca.Decl(
         name=name,
         quals=quals or [],
-        align=align or [],
         storage=storage or [],
         funcspec=funcspec or [],
         type=type,
@@ -409,7 +412,7 @@ def prune_ast(fn: ca.FuncDef, ast: ca.FileAST) -> int:
         inner_type = tp.type if isinstance(tp, ca.TypeDecl) else tp
         if isinstance(inner_type, ca.IdentifierType):
             return
-        if inner_type.name:
+        if hasattr(inner_type, "name") and inner_type.name:
             edges[inner_type.name].append(i)
         if isinstance(inner_type, ca.Enum) and inner_type.values:
             for value in inner_type.values.enumerators:

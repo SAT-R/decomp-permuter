@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Union, Dict, Set, List
 
 from pycparser import c_ast as ca
+from pycparserext.ext_c_parser import FuncDeclExt
 
 Type = Union[ca.PtrDecl, ca.ArrayDecl, ca.TypeDecl, ca.FuncDecl]
 SimpleType = Union[ca.PtrDecl, ca.TypeDecl]
@@ -33,7 +34,7 @@ def is_local_var(name: str, typemap: TypeMap) -> bool:
 def basic_type(name: Union[str, List[str]]) -> ca.TypeDecl:
     names = [name] if isinstance(name, str) else name
     idtype = ca.IdentifierType(names=names)
-    return ca.TypeDecl(declname=None, quals=[], align=[], type=idtype)
+    return ca.TypeDecl(declname=None, quals=[], type=idtype)
 
 
 def pointer(type: Type) -> ca.PtrDecl:
@@ -69,7 +70,8 @@ def get_decl_type(decl: ca.Decl) -> Type:
     """For a Decl that declares a variable (and not just a struct/union/enum),
     return its type."""
     assert decl.name is not None
-    assert isinstance(decl.type, (ca.PtrDecl, ca.ArrayDecl, ca.FuncDecl, ca.TypeDecl))
+    # print(type(decl.type), decl.type)
+    assert isinstance(decl.type, (ca.PtrDecl, ca.ArrayDecl, ca.FuncDecl, ca.TypeDecl, FuncDeclExt)), type(decl.type)
     return decl.type
 
 
@@ -180,7 +182,7 @@ def expr_type(node: ca.Node, typemap: TypeMap) -> Type:
         if isinstance(fptr_type, ca.PtrDecl):
             fptr_type = fptr_type.type
         fptr_type = resolve_typedefs(fptr_type, typemap)
-        assert isinstance(fptr_type, ca.FuncDecl), "call to non-function"
+        assert isinstance(fptr_type, (ca.FuncDecl, FuncDeclExt)), "call to non-function"
         return fptr_type.type
     if isinstance(node, ca.ExprList):
         return rec(node.exprs[-1])
@@ -189,6 +191,9 @@ def expr_type(node: ca.Node, typemap: TypeMap) -> Type:
         return deref_type(subtype, typemap)
     if isinstance(node, ca.TernaryOp):
         return rec(node.iftrue)
+    if isinstance(node, ca.Compound):
+        if len(node.block_items) == 2:
+            return rec(node.block_items[0])
     assert False, f"Unknown expression node type: {node}"
 
 
@@ -281,7 +286,7 @@ def build_typemap(ast: ca.FileAST, target_fn: ca.FuncDef) -> TypeMap:
             ret.var_types[enumerator.name] = basic_type("int")
 
         def visit_FuncDef(self, fn: ca.FuncDef) -> None:
-            assert isinstance(fn.decl.type, ca.FuncDecl)
+            assert isinstance(fn.decl.type, (ca.FuncDecl, FuncDeclExt)), type(fn.decl.type)
             if fn.decl.name is None:
                 return
             ret.var_types[fn.decl.name] = get_decl_type(fn.decl)
