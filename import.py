@@ -816,7 +816,12 @@ def download_decompme() -> None:
 
     print(f"Downloading scratch with ID {slug}...")
     try:
-        response_str = urllib.request.urlopen(f"{DECOMPME_API_BASE}/api/scratch/{slug}")
+        headers = {
+            "Referer": "https://decomp.me/scratch/{slug}",
+        }
+        req = urllib.request.Request(url=f"{DECOMPME_API_BASE}/api/scratch/{slug}", headers=headers)
+
+        response_str = urllib.request.urlopen(req)
         response_json = json.load(response_str)
 
         decompme_name = json_prop(response_json, "name", str)
