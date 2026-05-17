@@ -818,6 +818,7 @@ def download_decompme() -> None:
     try:
         headers = {
             "Referer": "https://decomp.me/scratch/{slug}",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
         }
         req = urllib.request.Request(url=f"{DECOMPME_API_BASE}/api/scratch/{slug}", headers=headers)
 
@@ -828,9 +829,8 @@ def download_decompme() -> None:
         compiler_id = json_prop(response_json, "compiler", str).replace(".", "_")
         compiler_flags = json_prop(response_json, "compiler_flags", str)
 
-        content = urllib.request.urlopen(
-            f"{DECOMPME_API_BASE}/api/scratch/{slug}/export"
-        )
+        req = urllib.request.Request(url=f"{DECOMPME_API_BASE}/api/scratch/{slug}/export", headers=headers)
+        content = urllib.request.urlopen(req)
         zip = zipfile.ZipFile(BytesIO(content.read()))
 
         dirname = create_directory(decompme_name)
